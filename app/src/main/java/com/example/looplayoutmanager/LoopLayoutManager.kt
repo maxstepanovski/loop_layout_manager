@@ -16,7 +16,7 @@ class LoopLayoutManager(
     override fun onLayoutChildren(recycler: RecyclerView.Recycler, state: RecyclerView.State) {
         super.onLayoutChildren(recycler, state)
         detachAndScrapAttachedViews(recycler)
-        fillToRight(0, 0, 0, recycler, state)
+        fillToRight(0, 0, recycler, state)
     }
 
     override fun canScrollHorizontally(): Boolean = true
@@ -40,25 +40,25 @@ class LoopLayoutManager(
                     val fromPosition = getPosition(view).let { position ->
                         (position + 1) % itemCount
                     }
-                    fillToRight(view.right, 0, fromPosition, recycler, state)
+                    fillToRight(view.right, fromPosition, recycler, state)
+                    recycleToLeft(recycler)
                 }
         } else if (dx < 0) {
             // Значит элементы уходят направо
+
         }
         return dx
     }
 
     private fun fillToRight(
         currentWidth: Int,
-        currentHeight: Int,
         startFromPosition: Int,
         recycler: RecyclerView.Recycler,
         state: RecyclerView.State
     ) {
         var accumulatedWidth = currentWidth
-        var accumulatedHeight = currentHeight
+        var accumulatedHeight = 0
         var counter = startFromPosition
-        var initialPosition = startFromPosition
         while (accumulatedWidth < width) {
             val view = recycler.getViewForPosition(counter % state.itemCount)
             addView(view)
@@ -72,13 +72,43 @@ class LoopLayoutManager(
                 accumulatedWidth + width,
                 accumulatedHeight + height
             )
-            if ((counter - initialPosition) % spanCount == spanCount - 1) {
+            if ((counter - startFromPosition) % spanCount == spanCount - 1) {
                 accumulatedHeight = 0
                 accumulatedWidth += view.width
             } else {
                 accumulatedHeight += view.height
             }
             counter++
+        }
+    }
+
+    private fun fillToLeft(
+        endWithPosition: Int,
+        recycler: RecyclerView.Recycler,
+        state: RecyclerView.State
+    ) {
+        getChildAt(0)?.let {
+
+        }
+    }
+
+    private fun recycleToLeft(recycler: RecyclerView.Recycler) {
+        for (i in 0 until childCount) {
+            getChildAt(i)?.let { view ->
+                if (view.right < 0) {
+                    removeAndRecycleView(view, recycler)
+                }
+            }
+        }
+    }
+
+    private fun recycleToRight(recycler: RecyclerView.Recycler) {
+        for (i in 0 until childCount) {
+            getChildAt(i)?.let { view ->
+                if (view.left > width) {
+                    removeAndRecycleView(view, recycler)
+                }
+            }
         }
     }
 }
