@@ -1,6 +1,5 @@
 package com.example.looplayoutmanager
 
-import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
@@ -10,6 +9,9 @@ class LoopLayoutManager(
     private val spanCount: Int
 ) : RecyclerView.LayoutManager() {
     private val viewsToRecycle = mutableListOf<View>()
+    private lateinit var recycler: RecyclerView.Recycler
+    private lateinit var state: RecyclerView.State
+    private var firstStart = true
 
     override fun generateDefaultLayoutParams(): RecyclerView.LayoutParams =
         RecyclerView.LayoutParams(
@@ -18,8 +20,18 @@ class LoopLayoutManager(
 
     override fun onLayoutChildren(recycler: RecyclerView.Recycler, state: RecyclerView.State) {
         super.onLayoutChildren(recycler, state)
-        detachAndScrapAttachedViews(recycler)
-        fillToRight(0, 0, recycler)
+        this.recycler = recycler
+        this.state = state
+        if (firstStart) {
+            detachAndScrapAttachedViews(recycler)
+            fillToRight(0, 0, recycler)
+            firstStart = false
+        }
+        for (i in 0 until childCount) {
+            getChildAt(i)?.let {
+                it.findViewById<TextView>(R.id.child_id).text = "$i"
+            }
+        }
     }
 
     override fun canScrollHorizontally(): Boolean = true
@@ -31,44 +43,71 @@ class LoopLayoutManager(
         recycler: RecyclerView.Recycler,
         state: RecyclerView.State
     ): Int {
-        Log.d("tag", "$dx")
         offsetChildrenHorizontal(-dx)
         for (i in 0 until childCount) {
             getChildAt(i)?.let {
                 it.findViewById<TextView>(R.id.child_id).text = "$i"
             }
         }
+        recycleViews()
         if (dx > 0) {
             // Значит элементы уходят налево
-            getChildAt(childCount - 1)
-                ?.takeIf {
-                    getDecoratedRight(it) < width
-                }
-                ?.let { view ->
-                    val fromPosition = getPosition(view).let { position ->
-                        (position + 1) % itemCount
-                    }
-                    fillToRight(getDecoratedRight(view), fromPosition, recycler)
-                }
+            publicFillToRight()
         } else if (dx < 0) {
             // Значит элементы уходят направо
-            getChildAt(0)
-                ?.takeIf {
-                    getDecoratedLeft(it) > 0
-                }
-                ?.let { view ->
-                    val fromPosition = getPosition(view).let { position ->
-                        if (position - spanCount >= 0) {
-                            position - spanCount
-                        } else {
-                            position - spanCount + itemCount
-                        }
-                    }
-//                    fillToLeft(getDecoratedLeft(view), fromPosition, recycler)
-                }
+            publicFillToLeft()
         }
-        recycleViews(recycler)
         return dx
+    }
+
+    fun publicFillToRight() {
+        findLastChild()
+            ?.takeIf {
+                getDecoratedRight(it) < width
+            }
+            ?.let { view ->
+                val fromPosition = getPosition(view).let { position ->
+                    (position + 1) % itemCount
+                }
+                fillToRight(getDecoratedRight(view), fromPosition, recycler)
+            }
+    }
+
+    fun publicFillToLeft() {
+        findFirstChild()
+            ?.takeIf {
+                getDecoratedLeft(it) > 0
+            }
+            ?.let { view ->
+                val fromPosition = getPosition(view).let { position ->
+                    if (position - spanCount >= 0) {
+                        position - spanCount
+                    } else {
+                        position - spanCount + state.itemCount
+                    }
+                }
+                fillToLeft(getDecoratedLeft(view), fromPosition, recycler)
+            }
+    }
+
+    fun recycleViews() {
+        val screenWidth = width
+        for (i in 0 until childCount) {
+            getChildAt(i)?.let { view ->
+                val right = getDecoratedRight(view)
+                val left = getDecoratedLeft(view)
+                if (right < 0) {
+                    viewsToRecycle.add(view)
+                }
+                if (left > screenWidth) {
+                    viewsToRecycle.add(view)
+                }
+            }
+        }
+        for (view in viewsToRecycle) {
+            detachAndScrapView(view, recycler)
+        }
+        viewsToRecycle.clear()
     }
 
     private fun fillToRight(currentX: Int, fromPosition: Int, recycler: RecyclerView.Recycler) {
@@ -129,19 +168,33 @@ class LoopLayoutManager(
         }
     }
 
-    private fun recycleViews(recycler: RecyclerView.Recycler) {
+    private fun findFirstChild(): View? {
+        var minTopLeftSum = width + height
+        var result: View? = null
         for (i in 0 until childCount) {
             getChildAt(i)?.let { view ->
-                val right = getDecoratedRight(view)
-                val left = getDecoratedLeft(view)
-                if (right < 0 || left > width) {
-                    viewsToRecycle.add(view)
+                val topLeft = getDecoratedTop(view) + getDecoratedLeft(view)
+                if (topLeft < minTopLeftSum) {
+                    minTopLeftSum = topLeft
+                    result = view
                 }
             }
         }
-        for (view in viewsToRecycle) {
-            detachAndScrapView(view, recycler)
+        return result
+    }
+
+    private fun findLastChild(): View? {
+        var maxBottomRight = 0
+        var result: View? = null
+        for (i in 0 until childCount) {
+            getChildAt(i)?.let { view ->
+                val bottomRight = getDecoratedRight(view) + getDecoratedBottom(view)
+                if (bottomRight > maxBottomRight) {
+                    maxBottomRight = bottomRight
+                    result = view
+                }
+            }
         }
-        viewsToRecycle.clear()
+        return result
     }
 }
