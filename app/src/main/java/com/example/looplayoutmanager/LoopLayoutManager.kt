@@ -1,12 +1,14 @@
 package com.example.looplayoutmanager
 
 import android.util.Log
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 
 class LoopLayoutManager(
     private val spanCount: Int
 ) : RecyclerView.LayoutManager() {
+    private val viewsToRecycle = mutableListOf<View>()
 
     override fun generateDefaultLayoutParams(): RecyclerView.LayoutParams =
         RecyclerView.LayoutParams(
@@ -16,7 +18,7 @@ class LoopLayoutManager(
     override fun onLayoutChildren(recycler: RecyclerView.Recycler, state: RecyclerView.State) {
         super.onLayoutChildren(recycler, state)
         detachAndScrapAttachedViews(recycler)
-        fillToRight(0, 0, recycler, state)
+        fillToRight(0, 0, recycler)
     }
 
     override fun canScrollHorizontally(): Boolean = true
@@ -34,81 +36,106 @@ class LoopLayoutManager(
             // Значит элементы уходят налево
             getChildAt(childCount - 1)
                 ?.takeIf {
-                    it.right < width
+                    getDecoratedRight(it) < width
                 }
                 ?.let { view ->
                     val fromPosition = getPosition(view).let { position ->
                         (position + 1) % itemCount
                     }
-                    fillToRight(view.right, fromPosition, recycler, state)
-                    recycleToLeft(recycler)
+                    fillToRight(getDecoratedRight(view), fromPosition, recycler)
                 }
         } else if (dx < 0) {
             // Значит элементы уходят направо
-
+            getChildAt(0)
+                ?.takeIf {
+                    getDecoratedLeft(it) > 0
+                }
+                ?.let { view ->
+                    val fromPosition = getPosition(view).let { position ->
+                        if (position - spanCount >= 0) {
+                            position - spanCount
+                        } else {
+                            position - spanCount + itemCount
+                        }
+                    }
+                    fillToLeft(getDecoratedLeft(view), fromPosition, recycler)
+                }
         }
+        recycleViews(recycler)
         return dx
     }
 
-    private fun fillToRight(
-        currentWidth: Int,
-        startFromPosition: Int,
-        recycler: RecyclerView.Recycler,
-        state: RecyclerView.State
-    ) {
-        var accumulatedWidth = currentWidth
+    private fun fillToRight(currentX: Int, fromPosition: Int, recycler: RecyclerView.Recycler) {
+        var accumulatedWidth = currentX
         var accumulatedHeight = 0
-        var counter = startFromPosition
+        var counter = fromPosition
         while (accumulatedWidth < width) {
-            val view = recycler.getViewForPosition(counter % state.itemCount)
+            val view = recycler.getViewForPosition(counter % itemCount)
             addView(view)
             measureChildWithMargins(view, 0, 0)
-            val width = getDecoratedMeasuredWidth(view)
-            val height = getDecoratedMeasuredHeight(view)
+            val viewWidth = getDecoratedMeasuredWidth(view)
+            val viewHeight = getDecoratedMeasuredHeight(view)
             layoutDecoratedWithMargins(
                 view,
                 accumulatedWidth,
                 accumulatedHeight,
-                accumulatedWidth + width,
-                accumulatedHeight + height
+                accumulatedWidth + viewWidth,
+                accumulatedHeight + viewHeight
             )
-            if ((counter - startFromPosition) % spanCount == spanCount - 1) {
+            if ((counter - fromPosition) % spanCount == spanCount - 1) {
                 accumulatedHeight = 0
-                accumulatedWidth += view.width
+                accumulatedWidth += viewWidth
             } else {
-                accumulatedHeight += view.height
+                accumulatedHeight += viewHeight
             }
             counter++
         }
     }
 
-    private fun fillToLeft(
-        endWithPosition: Int,
-        recycler: RecyclerView.Recycler,
-        state: RecyclerView.State
-    ) {
-        getChildAt(0)?.let {
-
-        }
-    }
-
-    private fun recycleToLeft(recycler: RecyclerView.Recycler) {
-        for (i in 0 until childCount) {
-            getChildAt(i)?.let { view ->
-                if (view.right < 0) {
-                    removeAndRecycleView(view, recycler)
+    private fun fillToLeft(fromX: Int, fromPosition: Int, recycler: RecyclerView.Recycler) {
+        var currentX = fromX
+        var accumulatedHeight = 0
+        var counter = fromPosition
+        while (currentX > 0) {
+            val view = recycler.getViewForPosition(counter)
+            addView(view)
+            measureChildWithMargins(view, 0, 0)
+            val viewWidth = getDecoratedMeasuredWidth(view)
+            val viewHeight = getDecoratedMeasuredHeight(view)
+            layoutDecoratedWithMargins(
+                view,
+                currentX - viewWidth,
+                accumulatedHeight,
+                currentX,
+                accumulatedHeight + viewHeight
+            )
+            if ((counter - fromPosition) % spanCount == spanCount - 1) {
+                accumulatedHeight = 0
+                currentX -= viewWidth
+                counter = counter - 2 * spanCount + 1
+                if (counter < 0) {
+                    counter += itemCount
                 }
+            } else {
+                accumulatedHeight += viewHeight
+                counter++
             }
         }
     }
 
-    private fun recycleToRight(recycler: RecyclerView.Recycler) {
+    private fun recycleViews(recycler: RecyclerView.Recycler) {
         for (i in 0 until childCount) {
             getChildAt(i)?.let { view ->
-                if (view.left > width) {
-                    removeAndRecycleView(view, recycler)
+                val right = getDecoratedRight(view)
+                val left = getDecoratedLeft(view)
+                if (right < 0 || left > width) {
+                    viewsToRecycle.add(view)
                 }
             }
         }
+        for (view in viewsToRecycle) {
+            detachAndScrapView(view, recycler)
+        }
+        viewsToRecycle.clear()
     }
 }

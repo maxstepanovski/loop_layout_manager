@@ -1,13 +1,12 @@
 package com.example.looplayoutmanager
 
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView
 
 class MainActivity : AppCompatActivity() {
     private val list = mutableListOf<Int>().apply {
-        for (i in 0 until 7) {
+        for (i in 0 until 9) {
             this.add(i)
         }
     }
