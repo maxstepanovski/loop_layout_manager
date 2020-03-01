@@ -3,6 +3,7 @@ package com.example.looplayoutmanager
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
 class LoopLayoutManager(
@@ -32,6 +33,11 @@ class LoopLayoutManager(
     ): Int {
         Log.d("tag", "$dx")
         offsetChildrenHorizontal(-dx)
+        for (i in 0 until childCount) {
+            getChildAt(i)?.let {
+                it.findViewById<TextView>(R.id.child_id).text = "$i"
+            }
+        }
         if (dx > 0) {
             // Значит элементы уходят налево
             getChildAt(childCount - 1)
@@ -58,7 +64,7 @@ class LoopLayoutManager(
                             position - spanCount + itemCount
                         }
                     }
-                    fillToLeft(getDecoratedLeft(view), fromPosition, recycler)
+//                    fillToLeft(getDecoratedLeft(view), fromPosition, recycler)
                 }
         }
         recycleViews(recycler)
