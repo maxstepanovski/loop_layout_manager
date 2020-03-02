@@ -1,7 +1,9 @@
 package com.example.looplayoutmanager
 
+import android.graphics.Rect
 import android.view.View
 import android.view.ViewGroup
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
 class LoopLayoutManager(
@@ -20,7 +22,11 @@ class LoopLayoutManager(
         super.onLayoutChildren(recycler, state)
         if (firstStart) {
             detachAndScrapAttachedViews(recycler)
-            fillRight(recycler, state, 0, 0)
+            if (orientation == RecyclerView.HORIZONTAL) {
+                fillRight(recycler, state, 0, 0)
+            } else {
+                fillBottom(recycler, state, 0, 0)
+            }
             firstStart = false
         }
     }
@@ -49,7 +55,7 @@ class LoopLayoutManager(
                 }
         } else if (dx < 0) {
             // Значит элементы уходят направо
-            findBottomLeftChild()
+            findTopLeftChild()
                 ?.takeIf {
                     getDecoratedLeft(it) > 0
                 }
@@ -72,6 +78,51 @@ class LoopLayoutManager(
         }
         recycleViews(recycler)
         return dx
+    }
+
+    override fun scrollVerticallyBy(
+        dy: Int,
+        recycler: RecyclerView.Recycler,
+        state: RecyclerView.State
+    ): Int {
+        offsetChildrenVertical(-dy)
+        if (dy > 0) {
+            // Значит элементы уходят вверх
+            findBottomRightChild()
+                ?.takeIf {
+                    getDecoratedBottom(it) < height
+                }
+                ?.let {
+                    val fromPosition = getPosition(it).let { position ->
+                        (position + 1) % itemCount
+                    }
+                    fillBottom(recycler, state, fromPosition, getDecoratedBottom(it))
+                }
+        } else if (dy < 0) {
+            // Значит элементы уходят вниз
+            findTopLeftChild()
+                ?.takeIf {
+                    getDecoratedTop(it) > 0
+                }
+                ?.let {
+                    val fromPosition = (getPosition(it) - 1).let { position ->
+                        if (position < 0) {
+                            state.itemCount - 1
+                        } else {
+                            position
+                        }
+                    }
+                    fillTop(
+                        recycler,
+                        state,
+                        fromPosition,
+                        (spanCount - 1) * getDecoratedMeasuredWidth(it),
+                        getDecoratedTop(it)
+                    )
+                }
+        }
+        recycleViews(recycler)
+        return dy
     }
 
     private fun fillRight(
@@ -142,16 +193,93 @@ class LoopLayoutManager(
         }
     }
 
+    private fun fillBottom(
+        recycler: RecyclerView.Recycler,
+        state: RecyclerView.State,
+        startPosition: Int,
+        startY: Int
+    ) {
+        var currentX = 0
+        var currentY = startY
+        var counter = startPosition
+        while (currentY < height) {
+            val view = recycler.getViewForPosition(counter % state.itemCount)
+            addView(view)
+            measureChildWithMargins(view, 0, 0)
+            val viewWidth = getDecoratedMeasuredWidth(view)
+            val viewHeight = getDecoratedMeasuredHeight(view)
+            layoutDecoratedWithMargins(
+                view,
+                currentX,
+                currentY,
+                currentX + viewWidth,
+                currentY + viewHeight
+            )
+            if (currentX == (spanCount - 1) * viewWidth) {
+                currentX = 0
+                currentY += viewHeight
+            } else {
+                currentX += viewWidth
+            }
+            counter++
+        }
+    }
+
+    private fun fillTop(
+        recycler: RecyclerView.Recycler,
+        state: RecyclerView.State,
+        startPosition: Int,
+        startX: Int,
+        startY: Int
+    ) {
+        var currentX = startX
+        var currentY = startY
+        var counter = startPosition
+        while (currentY > 0) {
+            val view = recycler.getViewForPosition(counter)
+            addView(view)
+            measureChildWithMargins(view, 0, 0)
+            val viewWidth = getDecoratedMeasuredWidth(view)
+            val viewHeight = getDecoratedMeasuredHeight(view)
+            layoutDecoratedWithMargins(
+                view,
+                currentX,
+                currentY - viewHeight,
+                currentX + viewWidth,
+                currentY
+            )
+            if (currentX == 0) {
+                currentY -= viewHeight
+                currentX = (spanCount - 1) * viewWidth
+            } else {
+                currentX -= viewWidth
+            }
+            counter--
+            if (counter < 0) {
+                counter = state.itemCount - 1
+            }
+        }
+    }
+
     private fun recycleViews(recycler: RecyclerView.Recycler) {
         val screenWidth = width
+        val screenHeight = height
         for (i in 0 until childCount) {
             getChildAt(i)?.let { view ->
                 val right = getDecoratedRight(view)
                 val left = getDecoratedLeft(view)
+                val bottom = getDecoratedBottom(view)
+                val top = getDecoratedTop(view)
                 if (right < 0) {
                     viewsToRecycle.add(view)
                 }
                 if (left > screenWidth) {
+                    viewsToRecycle.add(view)
+                }
+                if (bottom < 0) {
+                    viewsToRecycle.add(view)
+                }
+                if (top > screenHeight) {
                     viewsToRecycle.add(view)
                 }
             }
@@ -162,7 +290,7 @@ class LoopLayoutManager(
         viewsToRecycle.clear()
     }
 
-    private fun findBottomLeftChild(): View? {
+    private fun findTopLeftChild(): View? {
         var minTopLeftSum = width + height
         var result: View? = null
         for (i in 0 until childCount) {
@@ -190,5 +318,38 @@ class LoopLayoutManager(
             }
         }
         return result
+    }
+
+    override fun isAutoMeasureEnabled(): Boolean = true
+
+    override fun setMeasuredDimension(childrenBounds: Rect, wSpec: Int, hSpec: Int) {
+        val width: Int
+        val height: Int
+        val horizontalPadding = paddingLeft + paddingRight
+        val verticalPadding = paddingTop + paddingBottom
+        if (orientation == LinearLayoutManager.VERTICAL) {
+            val usedHeight = childrenBounds.height() + verticalPadding
+            height = chooseSize(
+                hSpec,
+                usedHeight,
+                minimumHeight
+            )
+            width = chooseSize(
+                wSpec, childrenBounds.width() + horizontalPadding,
+                minimumWidth
+            )
+        } else {
+            val usedWidth = childrenBounds.width() + horizontalPadding
+            width = chooseSize(
+                wSpec,
+                usedWidth,
+                minimumWidth
+            )
+            height = chooseSize(
+                hSpec, childrenBounds.height() + verticalPadding,
+                minimumHeight
+            )
+        }
+        setMeasuredDimension(width, height)
     }
 }
