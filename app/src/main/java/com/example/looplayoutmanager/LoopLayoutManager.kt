@@ -6,6 +6,9 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
+/**
+ * LayoutManager, реализующий бесконечную закольцованную прокрутку списка вертикально и горизонтально
+ */
 class LoopLayoutManager(
     private val spanCount: Int,
     private val orientation: Int
@@ -76,7 +79,7 @@ class LoopLayoutManager(
                     )
                 }
         }
-        recycleViews(recycler)
+        recycleViewsHorizontally(recycler)
         return dx
     }
 
@@ -121,10 +124,15 @@ class LoopLayoutManager(
                     )
                 }
         }
-        recycleViews(recycler)
+        recycleViewsVertically(recycler)
         return dy
     }
 
+    /**
+     * Заполнить пробел на экране вью холдэрами в направлении слева направо
+     * @param startPosition позиция адаптера с которой необходимо начать заполнение
+     * @param startX положение по Х, с которого необходимо начать заполнение
+     */
     private fun fillRight(
         recycler: RecyclerView.Recycler,
         state: RecyclerView.State,
@@ -157,6 +165,12 @@ class LoopLayoutManager(
         }
     }
 
+    /**
+     * Заполнить пробел на экране вью холдэрами в направлении справа налево
+     * @param startPosition позиция адаптера с которой необходимо начать заполнение
+     * @param startX начало отрисовки по Х
+     * @param startY начало отрисовки по У
+     */
     private fun fillLeft(
         recycler: RecyclerView.Recycler,
         state: RecyclerView.State,
@@ -193,6 +207,11 @@ class LoopLayoutManager(
         }
     }
 
+    /**
+     * Заполнить пробел на экране вью холдэрами в направлении сверху вниз
+     * @param startPosition позиция адаптера с которой необходимо начать заполнение
+     * @param startY начало отрисовки по У
+     */
     private fun fillBottom(
         recycler: RecyclerView.Recycler,
         state: RecyclerView.State,
@@ -225,6 +244,12 @@ class LoopLayoutManager(
         }
     }
 
+    /**
+     * Заполнить пробел на экране вью холдэрами в направлении снизу вверх
+     * @param startPosition позиция адаптера с которой необходимо начать заполнение
+     * @param startX начало отрисовки по Х
+     * @param startY начало отрисовки по У
+     */
     private fun fillTop(
         recycler: RecyclerView.Recycler,
         state: RecyclerView.State,
@@ -261,25 +286,18 @@ class LoopLayoutManager(
         }
     }
 
-    private fun recycleViews(recycler: RecyclerView.Recycler) {
+    /**
+     * Перерабатываем вью холдэры, которые ушли за границы экрана (горизонтальная прокрутка).
+     * Сначала помечаем вью холдэры на переработку и только затем перерабатываем, чтобы избежать пересчёта
+     * индексов вьб холдэров после каждого отдельного удаления
+     */
+    private fun recycleViewsHorizontally(recycler: RecyclerView.Recycler) {
         val screenWidth = width
-        val screenHeight = height
         for (i in 0 until childCount) {
             getChildAt(i)?.let { view ->
                 val right = getDecoratedRight(view)
                 val left = getDecoratedLeft(view)
-                val bottom = getDecoratedBottom(view)
-                val top = getDecoratedTop(view)
-                if (right < 0) {
-                    viewsToRecycle.add(view)
-                }
-                if (left > screenWidth) {
-                    viewsToRecycle.add(view)
-                }
-                if (bottom < 0) {
-                    viewsToRecycle.add(view)
-                }
-                if (top > screenHeight) {
+                if (right < 0 || left > screenWidth) {
                     viewsToRecycle.add(view)
                 }
             }
@@ -290,6 +308,31 @@ class LoopLayoutManager(
         viewsToRecycle.clear()
     }
 
+    /**
+     * Перерабатываем вью холдэры, которые ушли за границы экрана (вертикальная прокрутка).
+     * Сначала помечаем вью холдэры на переработку и только затем перерабатываем, чтобы избежать пересчёта
+     * индексов вьб холдэров после каждого отдельного удаления
+     */
+    private fun recycleViewsVertically(recycler: RecyclerView.Recycler) {
+        val screenHeight = height
+        for (i in 0 until childCount) {
+            getChildAt(i)?.let { view ->
+                val bottom = getDecoratedBottom(view)
+                val top = getDecoratedTop(view)
+                if (bottom < 0 || top > screenHeight) {
+                    viewsToRecycle.add(view)
+                }
+            }
+        }
+        for (view in viewsToRecycle) {
+            detachAndScrapView(view, recycler)
+        }
+        viewsToRecycle.clear()
+    }
+
+    /**
+     * Из всех child view, которые в данный момент на экране, находим самый левый верхний
+     */
     private fun findTopLeftChild(): View? {
         var minTopLeftSum = width + height
         var result: View? = null
@@ -305,6 +348,9 @@ class LoopLayoutManager(
         return result
     }
 
+    /**
+     * Из всех child view, которые в данный момент на экране, находим самый нижний правый
+     */
     private fun findBottomRightChild(): View? {
         var maxBottomRight = 0
         var result: View? = null
