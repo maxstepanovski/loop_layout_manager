@@ -2,15 +2,13 @@ package com.example.looplayoutmanager
 
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
 class LoopLayoutManager(
-    private val spanCount: Int
+    private val spanCount: Int,
+    private val orientation: Int
 ) : RecyclerView.LayoutManager() {
     private val viewsToRecycle = mutableListOf<View>()
-    private lateinit var recycler: RecyclerView.Recycler
-    private lateinit var state: RecyclerView.State
     private var firstStart = true
 
     override fun generateDefaultLayoutParams(): RecyclerView.LayoutParams =
@@ -20,23 +18,16 @@ class LoopLayoutManager(
 
     override fun onLayoutChildren(recycler: RecyclerView.Recycler, state: RecyclerView.State) {
         super.onLayoutChildren(recycler, state)
-        this.recycler = recycler
-        this.state = state
         if (firstStart) {
             detachAndScrapAttachedViews(recycler)
-            fillToRight(0, 0, recycler)
+            fillRight(recycler, state, 0, 0)
             firstStart = false
-        }
-        for (i in 0 until childCount) {
-            getChildAt(i)?.let {
-                it.findViewById<TextView>(R.id.child_id).text = "$i"
-            }
         }
     }
 
-    override fun canScrollHorizontally(): Boolean = true
+    override fun canScrollHorizontally(): Boolean = orientation == RecyclerView.HORIZONTAL
 
-    override fun canScrollVertically(): Boolean = false
+    override fun canScrollVertically(): Boolean = orientation == RecyclerView.VERTICAL
 
     override fun scrollHorizontallyBy(
         dx: Int,
@@ -44,53 +35,114 @@ class LoopLayoutManager(
         state: RecyclerView.State
     ): Int {
         offsetChildrenHorizontal(-dx)
-        for (i in 0 until childCount) {
-            getChildAt(i)?.let {
-                it.findViewById<TextView>(R.id.child_id).text = "$i"
-            }
-        }
-        recycleViews()
         if (dx > 0) {
             // Значит элементы уходят налево
-            publicFillToRight()
+            findBottomRightChild()
+                ?.takeIf {
+                    getDecoratedRight(it) < width
+                }
+                ?.let {
+                    val fromPosition = getPosition(it).let { position ->
+                        (position + 1) % itemCount
+                    }
+                    fillRight(recycler, state, fromPosition, getDecoratedRight(it))
+                }
         } else if (dx < 0) {
             // Значит элементы уходят направо
-            publicFillToLeft()
+            findBottomLeftChild()
+                ?.takeIf {
+                    getDecoratedLeft(it) > 0
+                }
+                ?.let {
+                    val fromPosition = (getPosition(it) - 1).let { position ->
+                        if (position < 0) {
+                            state.itemCount - 1
+                        } else {
+                            position
+                        }
+                    }
+                    fillLeft(
+                        recycler,
+                        state,
+                        fromPosition,
+                        getDecoratedLeft(it),
+                        (spanCount - 1) * getDecoratedMeasuredHeight(it)
+                    )
+                }
         }
+        recycleViews(recycler)
         return dx
     }
 
-    fun publicFillToRight() {
-        findLastChild()
-            ?.takeIf {
-                getDecoratedRight(it) < width
+    private fun fillRight(
+        recycler: RecyclerView.Recycler,
+        state: RecyclerView.State,
+        startPosition: Int,
+        startX: Int
+    ) {
+        var accumulatedWidth = startX
+        var accumulatedHeight = 0
+        var counter = startPosition
+        while (accumulatedWidth < width) {
+            val view = recycler.getViewForPosition(counter % state.itemCount)
+            addView(view)
+            measureChildWithMargins(view, 0, 0)
+            val viewWidth = getDecoratedMeasuredWidth(view)
+            val viewHeight = getDecoratedMeasuredHeight(view)
+            layoutDecoratedWithMargins(
+                view,
+                accumulatedWidth,
+                accumulatedHeight,
+                accumulatedWidth + viewWidth,
+                accumulatedHeight + viewHeight
+            )
+            if (accumulatedHeight == (spanCount - 1) * viewHeight) {
+                accumulatedHeight = 0
+                accumulatedWidth += viewWidth
+            } else {
+                accumulatedHeight += viewHeight
             }
-            ?.let { view ->
-                val fromPosition = getPosition(view).let { position ->
-                    (position + 1) % itemCount
-                }
-                fillToRight(getDecoratedRight(view), fromPosition, recycler)
-            }
+            counter++
+        }
     }
 
-    fun publicFillToLeft() {
-        findFirstChild()
-            ?.takeIf {
-                getDecoratedLeft(it) > 0
+    private fun fillLeft(
+        recycler: RecyclerView.Recycler,
+        state: RecyclerView.State,
+        startPosition: Int,
+        startX: Int,
+        startY: Int
+    ) {
+        var currentX = startX
+        var currentY = startY
+        var counter = startPosition
+        while (currentX > 0) {
+            val view = recycler.getViewForPosition(counter)
+            addView(view)
+            measureChildWithMargins(view, 0, 0)
+            val viewWidth = getDecoratedMeasuredWidth(view)
+            val viewHeight = getDecoratedMeasuredHeight(view)
+            layoutDecoratedWithMargins(
+                view,
+                currentX - viewWidth,
+                currentY,
+                currentX,
+                currentY + viewHeight
+            )
+            if (currentY == 0) {
+                currentY = startY
+                currentX -= viewWidth
+            } else {
+                currentY -= viewHeight
             }
-            ?.let { view ->
-                val fromPosition = getPosition(view).let { position ->
-                    if (position - spanCount >= 0) {
-                        position - spanCount
-                    } else {
-                        position - spanCount + state.itemCount
-                    }
-                }
-                fillToLeft(getDecoratedLeft(view), fromPosition, recycler)
+            counter--
+            if (counter < 0) {
+                counter = state.itemCount - 1
             }
+        }
     }
 
-    fun recycleViews() {
+    private fun recycleViews(recycler: RecyclerView.Recycler) {
         val screenWidth = width
         for (i in 0 until childCount) {
             getChildAt(i)?.let { view ->
@@ -110,65 +162,7 @@ class LoopLayoutManager(
         viewsToRecycle.clear()
     }
 
-    private fun fillToRight(currentX: Int, fromPosition: Int, recycler: RecyclerView.Recycler) {
-        var accumulatedWidth = currentX
-        var accumulatedHeight = 0
-        var counter = fromPosition
-        while (accumulatedWidth < width) {
-            val view = recycler.getViewForPosition(counter % itemCount)
-            addView(view)
-            measureChildWithMargins(view, 0, 0)
-            val viewWidth = getDecoratedMeasuredWidth(view)
-            val viewHeight = getDecoratedMeasuredHeight(view)
-            layoutDecoratedWithMargins(
-                view,
-                accumulatedWidth,
-                accumulatedHeight,
-                accumulatedWidth + viewWidth,
-                accumulatedHeight + viewHeight
-            )
-            if ((counter - fromPosition) % spanCount == spanCount - 1) {
-                accumulatedHeight = 0
-                accumulatedWidth += viewWidth
-            } else {
-                accumulatedHeight += viewHeight
-            }
-            counter++
-        }
-    }
-
-    private fun fillToLeft(fromX: Int, fromPosition: Int, recycler: RecyclerView.Recycler) {
-        var currentX = fromX
-        var accumulatedHeight = 0
-        var counter = fromPosition
-        while (currentX > 0) {
-            val view = recycler.getViewForPosition(counter)
-            addView(view)
-            measureChildWithMargins(view, 0, 0)
-            val viewWidth = getDecoratedMeasuredWidth(view)
-            val viewHeight = getDecoratedMeasuredHeight(view)
-            layoutDecoratedWithMargins(
-                view,
-                currentX - viewWidth,
-                accumulatedHeight,
-                currentX,
-                accumulatedHeight + viewHeight
-            )
-            if ((counter - fromPosition) % spanCount == spanCount - 1) {
-                accumulatedHeight = 0
-                currentX -= viewWidth
-                counter = counter - 2 * spanCount + 1
-                if (counter < 0) {
-                    counter += itemCount
-                }
-            } else {
-                accumulatedHeight += viewHeight
-                counter++
-            }
-        }
-    }
-
-    private fun findFirstChild(): View? {
+    private fun findBottomLeftChild(): View? {
         var minTopLeftSum = width + height
         var result: View? = null
         for (i in 0 until childCount) {
@@ -183,7 +177,7 @@ class LoopLayoutManager(
         return result
     }
 
-    private fun findLastChild(): View? {
+    private fun findBottomRightChild(): View? {
         var maxBottomRight = 0
         var result: View? = null
         for (i in 0 until childCount) {
