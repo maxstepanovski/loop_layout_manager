@@ -48,19 +48,19 @@ class LoopLayoutManager(
             // Значит элементы уходят налево
             findBottomRightChild()
                 ?.takeIf {
-                    getDecoratedRight(it) < width
+                    getDecoratedRightWithMargins(it) < width
                 }
                 ?.let {
                     val fromPosition = getPosition(it).let { position ->
                         (position + 1) % itemCount
                     }
-                    fillRight(recycler, state, fromPosition, getDecoratedRight(it))
+                    fillRight(recycler, state, fromPosition, getDecoratedRightWithMargins(it))
                 }
         } else if (dx < 0) {
             // Значит элементы уходят направо
             findTopLeftChild()
                 ?.takeIf {
-                    getDecoratedLeft(it) > 0
+                    getDecoratedLeftWithMargins(it) > 0
                 }
                 ?.let {
                     val fromPosition = (getPosition(it) - 1).let { position ->
@@ -74,8 +74,8 @@ class LoopLayoutManager(
                         recycler,
                         state,
                         fromPosition,
-                        getDecoratedLeft(it),
-                        (spanCount - 1) * getDecoratedMeasuredHeight(it)
+                        getDecoratedLeftWithMargins(it),
+                        (spanCount - 1) * getHeightWithMarginsAndDecorations(it)
                     )
                 }
         }
@@ -93,19 +93,19 @@ class LoopLayoutManager(
             // Значит элементы уходят вверх
             findBottomRightChild()
                 ?.takeIf {
-                    getDecoratedBottom(it) < height
+                    getDecoratedBottomWithMargins(it) < height
                 }
                 ?.let {
                     val fromPosition = getPosition(it).let { position ->
                         (position + 1) % itemCount
                     }
-                    fillBottom(recycler, state, fromPosition, getDecoratedBottom(it))
+                    fillBottom(recycler, state, fromPosition, getDecoratedBottomWithMargins(it))
                 }
         } else if (dy < 0) {
             // Значит элементы уходят вниз
             findTopLeftChild()
                 ?.takeIf {
-                    getDecoratedTop(it) > 0
+                    getDecoratedTopWithMargins(it) > 0
                 }
                 ?.let {
                     val fromPosition = (getPosition(it) - 1).let { position ->
@@ -119,8 +119,8 @@ class LoopLayoutManager(
                         recycler,
                         state,
                         fromPosition,
-                        (spanCount - 1) * getDecoratedMeasuredWidth(it),
-                        getDecoratedTop(it)
+                        (spanCount - 1) * getWidthWithMarginsAndDecorations(it),
+                        getDecoratedTopWithMargins(it)
                     )
                 }
         }
@@ -146,8 +146,8 @@ class LoopLayoutManager(
             val view = recycler.getViewForPosition(counter % state.itemCount)
             addView(view)
             measureChildWithMargins(view, 0, 0)
-            val viewWidth = getDecoratedMeasuredWidth(view)
-            val viewHeight = getDecoratedMeasuredHeight(view)
+            val viewWidth = getWidthWithMarginsAndDecorations(view)
+            val viewHeight = getHeightWithMarginsAndDecorations(view)
             layoutDecoratedWithMargins(
                 view,
                 accumulatedWidth,
@@ -185,8 +185,8 @@ class LoopLayoutManager(
             val view = recycler.getViewForPosition(counter)
             addView(view)
             measureChildWithMargins(view, 0, 0)
-            val viewWidth = getDecoratedMeasuredWidth(view)
-            val viewHeight = getDecoratedMeasuredHeight(view)
+            val viewWidth = getWidthWithMarginsAndDecorations(view)
+            val viewHeight = getHeightWithMarginsAndDecorations(view)
             layoutDecoratedWithMargins(
                 view,
                 currentX - viewWidth,
@@ -225,8 +225,8 @@ class LoopLayoutManager(
             val view = recycler.getViewForPosition(counter % state.itemCount)
             addView(view)
             measureChildWithMargins(view, 0, 0)
-            val viewWidth = getDecoratedMeasuredWidth(view)
-            val viewHeight = getDecoratedMeasuredHeight(view)
+            val viewWidth = getWidthWithMarginsAndDecorations(view)
+            val viewHeight = getHeightWithMarginsAndDecorations(view)
             layoutDecoratedWithMargins(
                 view,
                 currentX,
@@ -264,8 +264,8 @@ class LoopLayoutManager(
             val view = recycler.getViewForPosition(counter)
             addView(view)
             measureChildWithMargins(view, 0, 0)
-            val viewWidth = getDecoratedMeasuredWidth(view)
-            val viewHeight = getDecoratedMeasuredHeight(view)
+            val viewWidth = getWidthWithMarginsAndDecorations(view)
+            val viewHeight = getHeightWithMarginsAndDecorations(view)
             layoutDecoratedWithMargins(
                 view,
                 currentX,
@@ -364,6 +364,54 @@ class LoopLayoutManager(
             }
         }
         return result
+    }
+
+    /**
+     * Ширина вью с учётом margin & decoration insets
+     */
+    private fun getWidthWithMarginsAndDecorations(view: View): Int {
+        val lp = view.layoutParams as RecyclerView.LayoutParams
+        return getDecoratedMeasuredWidth(view) + lp.leftMargin + lp.rightMargin
+    }
+
+    /**
+     * Высота вью с учётом margin & decoration insets
+     */
+    private fun getHeightWithMarginsAndDecorations(view: View): Int {
+        val lp = view.layoutParams as RecyclerView.LayoutParams
+        return getDecoratedMeasuredHeight(view) + lp.topMargin + lp.bottomMargin
+    }
+
+    /**
+     * Левый край вью с учётом margin & decoration insets
+     */
+    private fun getDecoratedLeftWithMargins(view: View): Int {
+        val lp = view.layoutParams as RecyclerView.LayoutParams
+        return getDecoratedLeft(view) - lp.leftMargin
+    }
+
+    /**
+     * Верхний край вью с учётом margin & decoration insets
+     */
+    private fun getDecoratedTopWithMargins(view: View): Int {
+        val lp = view.layoutParams as RecyclerView.LayoutParams
+        return getDecoratedTop(view) - lp.topMargin
+    }
+
+    /**
+     * Правый край вью с учётом margin & decoration insets
+     */
+    private fun getDecoratedRightWithMargins(view: View): Int {
+        val lp = view.layoutParams as RecyclerView.LayoutParams
+        return getDecoratedRight(view) + lp.rightMargin
+    }
+
+    /**
+     * Нижний край вью с учётом margin & decoration insets
+     */
+    private fun getDecoratedBottomWithMargins(view: View): Int {
+        val lp = view.layoutParams as RecyclerView.LayoutParams
+        return getDecoratedBottom(view) + lp.bottomMargin
     }
 
     override fun isAutoMeasureEnabled(): Boolean = true

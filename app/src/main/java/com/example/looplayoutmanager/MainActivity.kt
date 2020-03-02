@@ -6,7 +6,7 @@ import androidx.recyclerview.widget.RecyclerView
 
 class MainActivity : AppCompatActivity() {
     private val list = mutableListOf<Int>().apply {
-        for (i in 0 until 1) {
+        for (i in 0 until 15) {
             this.add(i)
         }
     }
@@ -16,7 +16,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         val recyclerView = findViewById<RecyclerView>(R.id.recycler_view)
         with(recyclerView) {
-            layoutManager = LoopLayoutManager(4, RecyclerView.HORIZONTAL)
+            layoutManager = LoopLayoutManager(2, RecyclerView.HORIZONTAL)
             adapter = LoopAdapter().apply { itemList = list }
         }
     }
