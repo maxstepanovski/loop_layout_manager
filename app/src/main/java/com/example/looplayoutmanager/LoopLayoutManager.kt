@@ -1,18 +1,19 @@
 package com.example.looplayoutmanager
 
-import android.graphics.Rect
+import android.content.Context
 import android.view.View
 import android.view.ViewGroup
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
 /**
  * LayoutManager, реализующий бесконечную закольцованную прокрутку списка вертикально и горизонтально
  */
 class LoopLayoutManager(
-    private val spanCount: Int,
-    private val orientation: Int
-) : RecyclerView.LayoutManager() {
+    context: Context,
+    spanCount: Int,
+    orientation: Int
+) : GridLayoutManager(context, spanCount, orientation, false) {
     private val viewsToRecycle = mutableListOf<View>()
     private var firstStart = true
 
@@ -295,8 +296,8 @@ class LoopLayoutManager(
         val screenWidth = width
         for (i in 0 until childCount) {
             getChildAt(i)?.let { view ->
-                val right = getDecoratedRight(view)
-                val left = getDecoratedLeft(view)
+                val right = getDecoratedRightWithMargins(view)
+                val left = getDecoratedLeftWithMargins(view)
                 if (right < 0 || left > screenWidth) {
                     viewsToRecycle.add(view)
                 }
@@ -317,8 +318,8 @@ class LoopLayoutManager(
         val screenHeight = height
         for (i in 0 until childCount) {
             getChildAt(i)?.let { view ->
-                val bottom = getDecoratedBottom(view)
-                val top = getDecoratedTop(view)
+                val bottom = getDecoratedBottomWithMargins(view)
+                val top = getDecoratedTopWithMargins(view)
                 if (bottom < 0 || top > screenHeight) {
                     viewsToRecycle.add(view)
                 }
@@ -412,38 +413,5 @@ class LoopLayoutManager(
     private fun getDecoratedBottomWithMargins(view: View): Int {
         val lp = view.layoutParams as RecyclerView.LayoutParams
         return getDecoratedBottom(view) + lp.bottomMargin
-    }
-
-    override fun isAutoMeasureEnabled(): Boolean = true
-
-    override fun setMeasuredDimension(childrenBounds: Rect, wSpec: Int, hSpec: Int) {
-        val width: Int
-        val height: Int
-        val horizontalPadding = paddingLeft + paddingRight
-        val verticalPadding = paddingTop + paddingBottom
-        if (orientation == LinearLayoutManager.VERTICAL) {
-            val usedHeight = childrenBounds.height() + verticalPadding
-            height = chooseSize(
-                hSpec,
-                usedHeight,
-                minimumHeight
-            )
-            width = chooseSize(
-                wSpec, childrenBounds.width() + horizontalPadding,
-                minimumWidth
-            )
-        } else {
-            val usedWidth = childrenBounds.width() + horizontalPadding
-            width = chooseSize(
-                wSpec,
-                usedWidth,
-                minimumWidth
-            )
-            height = chooseSize(
-                hSpec, childrenBounds.height() + verticalPadding,
-                minimumHeight
-            )
-        }
-        setMeasuredDimension(width, height)
     }
 }
