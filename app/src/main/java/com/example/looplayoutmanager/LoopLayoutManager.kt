@@ -95,7 +95,7 @@ class LoopLayoutManager(
             // Значит элементы уходят вверх
             findBottomRightChild()
                 ?.takeIf {
-                    getDecoratedBottomWithMargins(it) < height
+                    getDecoratedBottomWithMargins(it) - overallOffset < height
                 }
                 ?.let {
                     val fromPosition = getPosition(it).let { position ->
@@ -107,7 +107,7 @@ class LoopLayoutManager(
             // Значит элементы уходят вниз
             findTopLeftChild()
                 ?.takeIf {
-                    getDecoratedTopWithMargins(it) > 0
+                    getDecoratedTopWithMargins(it) + overallOffset > 0
                 }
                 ?.let {
                     val fromPosition = (getPosition(it) - 1).let { position ->
@@ -201,6 +201,7 @@ class LoopLayoutManager(
             if (currentY == 0) {
                 currentY = startY
                 currentX -= viewWidth
+                currentX += overallOffset
             } else {
                 currentY -= viewHeight
                 currentX -= offset
@@ -224,7 +225,7 @@ class LoopLayoutManager(
         startY: Int
     ) {
         var currentX = 0
-        var currentY = startY
+        var currentY = startY - overallOffset
         var counter = startPosition
         while (currentY < height) {
             val view = recycler.getViewForPosition(counter % state.itemCount)
@@ -242,8 +243,10 @@ class LoopLayoutManager(
             if (currentX == (spanCount - 1) * viewWidth) {
                 currentX = 0
                 currentY += viewHeight
+                currentY -= overallOffset
             } else {
                 currentX += viewWidth
+                currentY += offset
             }
             counter++
         }
@@ -263,7 +266,7 @@ class LoopLayoutManager(
         startY: Int
     ) {
         var currentX = startX
-        var currentY = startY
+        var currentY = startY + overallOffset
         var counter = startPosition
         while (currentY > 0) {
             val view = recycler.getViewForPosition(counter)
@@ -280,9 +283,11 @@ class LoopLayoutManager(
             )
             if (currentX == 0) {
                 currentY -= viewHeight
+                currentY += overallOffset
                 currentX = (spanCount - 1) * viewWidth
             } else {
                 currentX -= viewWidth
+                currentY -= offset
             }
             counter--
             if (counter < 0) {
