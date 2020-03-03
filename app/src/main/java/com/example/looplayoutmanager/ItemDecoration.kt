@@ -11,7 +11,12 @@ class ItemDecoration(context: Context) : RecyclerView.ItemDecoration() {
     private val horizontalMargin = 40
     private val verticalMargin = 40
 
-    override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) {
+    override fun getItemOffsets(
+        outRect: Rect,
+        view: View,
+        parent: RecyclerView,
+        state: RecyclerView.State
+    ) {
         val position = parent.getChildAdapterPosition(view)
         val lm = parent.layoutManager as GridLayoutManager
         if (lm.spanCount == 1) {

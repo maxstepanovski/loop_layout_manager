@@ -17,9 +17,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         val recyclerView = findViewById<RecyclerView>(R.id.recycler_view)
         with(recyclerView) {
-            layoutManager = LoopLayoutManager(context, 2, RecyclerView.HORIZONTAL)
+            layoutManager = LoopLayoutManager( 3, RecyclerView.HORIZONTAL, 100)
             adapter = LoopAdapter().apply { itemList = list }
-            addItemDecoration(ItemDecoration(context))
+//            addItemDecoration(ItemDecoration(context))
         }
     }
 }
